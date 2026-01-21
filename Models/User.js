@@ -29,6 +29,13 @@ aadhaarCardNumber: {
   type: String,
   unique: true
 },
+ // ✅ Delete account fields
+  deleteToken: {
+    type: String,
+  },
+  deleteTokenExpiration: {
+    type: Date,
+  },
   forms: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Form' }],
 }, {
   timestamps: true  // CreatedAt and UpdatedAt fields automatically

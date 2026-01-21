@@ -7,6 +7,8 @@ import cloudinary from '../config/cloudinary.js';
 import { fileURLToPath } from 'url';
 import College from '../Models/College.js';
 import Form from '../Models/Form.js';
+import crypto from 'crypto';
+import nodemailer from 'nodemailer';
 
 
 
@@ -446,7 +448,7 @@ export const submitForm = async (req, res) => {
       return res.status(404).json({ message: 'College not found' });
     }
 
-    // Create the form with student ID
+    // Create the form with status Submitted
     const form = new Form({
       name,
       mobile,
@@ -456,7 +458,8 @@ export const submitForm = async (req, res) => {
       upi,
       group,
       college: collegeId,
-      student: userId   // ✅ storing userId in student field
+      student: userId,
+      status: 'Submitted' // ✅ status set here
     });
 
     await form.save();
@@ -468,10 +471,10 @@ export const submitForm = async (req, res) => {
       await user.save();
     }
 
-    // Populate college details and student info
+    // Populate college & student info
     const populatedForm = await Form.findById(form._id)
       .populate('college')
-      .populate('student', 'username email'); // optional: populate student info
+      .populate('student', 'name email');
 
     return res.status(201).json({
       message: 'Form submitted successfully',
@@ -485,6 +488,7 @@ export const submitForm = async (req, res) => {
 
 
 
+
 export const getSubmittedFormsByUser = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -494,7 +498,7 @@ export const getSubmittedFormsByUser = async (req, res) => {
       status: 'Submitted'
     })
       .populate('college')
-      .populate('student', 'username email');
+      .populate('student', 'name email mobile');
 
     return res.status(200).json({
       message: 'Submitted forms fetched successfully',
@@ -503,5 +507,193 @@ export const getSubmittedFormsByUser = async (req, res) => {
   } catch (error) {
     console.error('Error fetching submitted forms:', error);
     res.status(500).json({ message: 'Server error' });
+  }
+};
+
+
+
+export const deleteUserAccount = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // Check user exists
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Delete all forms submitted by this user
+    await Form.deleteMany({ student: userId });
+
+    // Delete user
+    await User.findByIdAndDelete(userId);
+
+    return res.status(200).json({
+      message: 'Account deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting account:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+
+
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: "pms226803@gmail.com",
+    pass: "nrasbifqxsxzurrm",
+  },
+});
+
+
+export const deleteAccount = async (req, res) => {
+  const { email, reason } = req.body;
+
+  if (!email || !reason) {
+    return res.status(400).json({
+      message: "Email and deletion reason are required",
+    });
+  }
+
+  try {
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Generate token
+    const token = crypto.randomBytes(20).toString("hex");
+    const deleteLink = `${process.env.BASE_URL}/confirm-delete-account/${token}`;
+
+    // Save token & expiry
+    user.deleteToken = token;
+    user.deleteTokenExpiration = Date.now() + 60 * 60 * 1000; // 1 hour
+    await user.save();
+
+    console.log("User deleteToken:", user.deleteToken);
+    console.log("User deleteTokenExpiration:", user.deleteTokenExpiration);
+
+    // Send email
+    const mailOptions = {
+      from: "pms226803@gmail.com",
+      to: email,
+      subject: "Confirm Account Deletion",
+      text: `Hi ${user.name || "User"},
+
+We received your account deletion request.
+
+To confirm deletion, click the link below:
+${deleteLink}
+
+Reason:
+${reason}
+
+If you did not request this, please ignore this email.
+
+Regards,
+Your Team`,
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    return res.status(200).json({
+      message: "Account deletion link sent successfully. Please check your email.",
+    });
+
+  } catch (error) {
+    console.error("Delete user request error:", error);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const confirmDeleteAccount = async (req, res) => {
+  const { token } = req.params;
+
+  try {
+    const user = await User.findOne({
+      deleteToken: token,
+      deleteTokenExpiration: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: "Invalid or expired token" });
+    }
+
+    // Optional: delete user's forms also
+    // await Form.deleteMany({ student: user._id });
+
+    await User.findByIdAndDelete(user._id);
+
+    return res.status(200).json({
+      message: "Your account has been deleted successfully",
+    });
+
+  } catch (error) {
+    console.error("Confirm delete user error:", error);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+
+
+export const updateUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { name, email, aadhaarCardNumber } = req.body;
+
+    // At least one field required
+    if (!name && !email && !aadhaarCardNumber) {
+      return res.status(400).json({
+        message: "At least one field is required to update"
+      });
+    }
+
+    // Check user exists
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Duplicate check (email & aadhaar)
+    if (email || aadhaarCardNumber) {
+      const existingUser = await User.findOne({
+        _id: { $ne: userId },
+        $or: [
+          email ? { email } : null,
+          aadhaarCardNumber ? { aadhaarCardNumber } : null
+        ].filter(Boolean)
+      });
+
+      if (existingUser) {
+        return res.status(400).json({
+          message: "Email or Aadhaar already in use"
+        });
+      }
+    }
+
+    // Update allowed fields
+    if (name) user.name = name;
+    if (email) user.email = email;
+    if (aadhaarCardNumber) user.aadhaarCardNumber = aadhaarCardNumber;
+
+    await user.save();
+
+    return res.status(200).json({
+      message: "User updated successfully",
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        aadhaarCardNumber: user.aadhaarCardNumber,
+        updatedAt: user.updatedAt
+      }
+    });
+
+  } catch (error) {
+    console.error("Error in updateUser:", error);
+    return res.status(500).json({ message: "Server error" });
   }
 };

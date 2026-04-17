@@ -23,7 +23,7 @@ export const createCollege = async (req, res) => {
     // save locally
     await imageFile.mv(uploadPath);
 
-    const imageUrl = `${req.protocol}://${req.get("host")}/uploads/colleges/${fileName}`;
+    const imageUrl = `${BASE_URL}/uploads/colleges/${fileName}`;
 
     const college = new College({
       name,
@@ -65,7 +65,7 @@ export const updateCollege = async (req, res) => {
 
       await imageFile.mv(uploadPath);
 
-      college.image = `${req.protocol}://${req.get("host")}/uploads/colleges/${fileName}`;
+      college.image = `${BASE_URL}/uploads/colleges/${fileName}`;
     }
 
     if (name) college.name = name;
@@ -142,6 +142,7 @@ export const getSingleCollege = async (req, res) => {
   }
 };
 
+    const BASE_URL = "http://31.97.206.144:4063";
 
 
 export const createBanner = async (req, res) => {
@@ -169,7 +170,7 @@ export const createBanner = async (req, res) => {
       // move file to folder
       await file.mv(uploadPath);
 
-      const imageUrl = `${req.protocol}://${req.get("host")}/uploads/banners/${fileName}`;
+      const imageUrl = `${BASE_URL}/uploads/banners/${fileName}`;
       uploadedImages.push(imageUrl);
     }
 
@@ -217,7 +218,7 @@ export const updateBanner = async (req, res) => {
         // save file locally
         await file.mv(uploadPath);
 
-        const imageUrl = `${req.protocol}://${req.get("host")}/uploads/banners/${fileName}`;
+        const imageUrl = `${BASE_URL}/uploads/banners/${fileName}`;
 
         uploadedImages.push(imageUrl);
       }

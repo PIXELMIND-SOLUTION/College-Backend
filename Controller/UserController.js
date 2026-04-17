@@ -14,6 +14,7 @@ import nodemailer from 'nodemailer';
 
 dotenv.config();
 
+    const BASE_URL = "http://31.97.206.144:4063";
 
 
 cloudinary.config({
@@ -258,7 +259,7 @@ export const createProfile = async (req, res) => {
 
     await profileImage.mv(uploadPath);
 
-    user.profileImage = `${req.protocol}://${req.get("host")}/uploads/profile/${fileName}`;
+    user.profileImage = `${BASE_URL}/uploads/profile/${fileName}`;
 
     await user.save();
 
@@ -295,7 +296,7 @@ export const editProfileImage = async (req, res) => {
 
       await profileImage.mv(uploadPath);
 
-      user.profileImage = `${req.protocol}://${req.get("host")}/uploads/profile/${fileName}`;
+      user.profileImage = `${BASE_URL}/uploads/profile/${fileName}`;
     }
 
     await user.save();

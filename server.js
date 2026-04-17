@@ -12,7 +12,15 @@ import cloudinary from './config/cloudinary.js';
 import fileUpload from 'express-fileupload';
 import collegeRoutes from './Routes/collegeRoutes.js'
 import adminRoutes from "./Routes/adminRoutes.js"
+import dns from "dns";   // 👈 ADD THIS
+import fs from "fs";
 
+
+// 👇 ADD THIS RIGHT HERE
+dns.setServers([
+  "8.8.8.8",
+  "8.8.4.4"
+]);
 dotenv.config();
 
 const app = express();
@@ -24,6 +32,20 @@ const __dirname = path.dirname(__filename);
 
 // ✅ Serve static files from /uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+if (!fs.existsSync("uploads/banners")) {
+  fs.mkdirSync("uploads/banners", { recursive: true });
+}
+
+
+if (!fs.existsSync("uploads/colleges")) {
+  fs.mkdirSync("uploads/colleges", { recursive: true });
+}
+
+
+if (!fs.existsSync("uploads/profile")) {
+  fs.mkdirSync("uploads/profile", { recursive: true });
+}
 
 app.use(cors({
   origin: ['http://localhost:3000', 'http://31.97.206.144:7686', 'https://vidya-enrolldeleteurl.vercel.app'],

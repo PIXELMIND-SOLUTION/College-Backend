@@ -240,90 +240,77 @@ const upload = multer({
 
 export const createProfile = async (req, res) => {
   try {
-    const userId = req.params.id; // Get the userId from request params
+    const userId = req.params.id;
 
-    // Check if the user exists
-    const existingUser = await User.findById(userId);
-    if (!existingUser) {
-      return res.status(404).json({ message: 'User not found!' });
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
     }
 
-    // Check if a file is uploaded
     if (!req.files || !req.files.profileImage) {
-      return res.status(400).json({ message: 'No file uploaded!' });
+      return res.status(400).json({ message: "Profile image required" });
     }
 
-    // Get the uploaded file (profileImage)
     const profileImage = req.files.profileImage;
 
-    // Upload the profile image to Cloudinary
-    const uploadedImage = await cloudinary.uploader.upload(profileImage.tempFilePath, {
-      folder: 'poster', // Cloudinary folder where images will be stored
-    });
+    const fileName = Date.now() + "-" + profileImage.name;
+    const uploadPath = `uploads/profile/${fileName}`;
 
-    // Save the uploaded image URL to the user's profile
-    existingUser.profileImage = uploadedImage.secure_url;
+    await profileImage.mv(uploadPath);
 
-    // Save the updated user data to the database
-    await existingUser.save();
+    user.profileImage = `${req.protocol}://${req.get("host")}/uploads/profile/${fileName}`;
 
-    // Respond with the updated user profile
+    await user.save();
+
     return res.status(200).json({
-      message: 'Profile image uploaded successfully!',
+      message: "Profile image uploaded successfully",
       user: {
-        id: existingUser._id,
-        profileImage: existingUser.profileImage,
+        id: user._id,
+        profileImage: user.profileImage,
       },
     });
+
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ message: 'Server error' });
+    return res.status(500).json({ message: "Server error" });
   }
 };
-// Update Profile Image (with userId in params)
+
+
 export const editProfileImage = async (req, res) => {
   try {
-    const userId = req.params.id; // Get the userId from request params
+    const userId = req.params.id;
 
-    // Check if the user exists
-    const existingUser = await User.findById(userId);
-    if (!existingUser) {
-      return res.status(404).json({ message: 'User not found!' });
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
     }
 
-    // Check if a new file is uploaded
-    if (!req.files || !req.files.profileImage) {
-      return res.status(400).json({ message: 'No new file uploaded!' });
+    // 🔁 Update image if new file provided
+    if (req.files && req.files.profileImage) {
+      const profileImage = req.files.profileImage;
+
+      const fileName = Date.now() + "-" + profileImage.name;
+      const uploadPath = `uploads/profile/${fileName}`;
+
+      await profileImage.mv(uploadPath);
+
+      user.profileImage = `${req.protocol}://${req.get("host")}/uploads/profile/${fileName}`;
     }
 
-    const newProfileImage = req.files.profileImage;
+    await user.save();
 
-    // OPTIONAL: Delete previous image from Cloudinary if you stored public_id
-    // You can store public_id during upload for this purpose
-
-    // Upload the new image to Cloudinary
-    const uploadedImage = await cloudinary.uploader.upload(newProfileImage.tempFilePath, {
-      folder: 'poster',
-    });
-
-    // Update the profileImage field with new URL
-    existingUser.profileImage = uploadedImage.secure_url;
-
-    // Save updated user
-    await existingUser.save();
-
-    // Respond
     return res.status(200).json({
-      message: 'Profile image updated successfully!',
+      message: "Profile updated successfully",
       user: {
-        id: existingUser._id,
-        profileImage: existingUser.profileImage,
+        id: user._id,
+        profileImage: user.profileImage,
       },
     });
 
   } catch (error) {
-    console.error('Error updating profile image:', error);
-    return res.status(500).json({ message: 'Server error' });
+    console.error(error);
+    return res.status(500).json({ message: "Server error" });
   }
 };
 

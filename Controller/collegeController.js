@@ -17,18 +17,18 @@ export const createCollege = async (req, res) => {
 
     const imageFile = req.files.image;
 
-    // ⬆️ Upload to Cloudinary
-    const uploadResult = await cloudinary.uploader.upload(
-      imageFile.tempFilePath,
-      {
-        folder: "colleges",
-      }
-    );
+    const fileName = Date.now() + "-" + imageFile.name;
+    const uploadPath = `uploads/colleges/${fileName}`;
+
+    // save locally
+    await imageFile.mv(uploadPath);
+
+    const imageUrl = `${req.protocol}://${req.get("host")}/uploads/colleges/${fileName}`;
 
     const college = new College({
       name,
       location,
-      image: uploadResult.secure_url, // ✅ cloudinary URL
+      image: imageUrl,
     });
 
     await college.save();
@@ -44,6 +44,7 @@ export const createCollege = async (req, res) => {
   }
 };
 
+
 export const updateCollege = async (req, res) => {
   try {
     const { id } = req.params;
@@ -55,18 +56,16 @@ export const updateCollege = async (req, res) => {
       return res.status(404).json({ message: "College not found" });
     }
 
-    // 🔁 Update image only if new image provided
+    // 🔁 Update image if new file provided
     if (req.files && req.files.image) {
       const imageFile = req.files.image;
 
-      const uploadResult = await cloudinary.uploader.upload(
-        imageFile.tempFilePath,
-        {
-          folder: "colleges",
-        }
-      );
+      const fileName = Date.now() + "-" + imageFile.name;
+      const uploadPath = `uploads/colleges/${fileName}`;
 
-      college.image = uploadResult.secure_url;
+      await imageFile.mv(uploadPath);
+
+      college.image = `${req.protocol}://${req.get("host")}/uploads/colleges/${fileName}`;
     }
 
     if (name) college.name = name;
@@ -84,7 +83,6 @@ export const updateCollege = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
-
 
 export const deleteCollege = async (req, res) => {
   try {
@@ -148,37 +146,36 @@ export const getSingleCollege = async (req, res) => {
 
 export const createBanner = async (req, res) => {
   try {
-    // ❌ images body se nahi
     if (!req.files || !req.files.images) {
-      return res.status(400).json({ message: "At least one image file is required" });
+      return res.status(400).json({
+        message: "At least one image file is required"
+      });
     }
 
     let imagesFiles = req.files.images;
 
-    // 👉 single file aaye to array bana do
     if (!Array.isArray(imagesFiles)) {
       imagesFiles = [imagesFiles];
     }
 
     const uploadedImages = [];
 
-    // ⬆️ Upload all images to cloudinary
     for (const file of imagesFiles) {
-      const result = await cloudinary.uploader.upload(
-        file.tempFilePath,
-        {
-          folder: "banners",
-        }
-      );
+      // unique filename
+      const fileName = Date.now() + "-" + file.name;
 
-      uploadedImages.push(result.secure_url);
+      const uploadPath = `uploads/banners/${fileName}`;
+
+      // move file to folder
+      await file.mv(uploadPath);
+
+      const imageUrl = `${req.protocol}://${req.get("host")}/uploads/banners/${fileName}`;
+      uploadedImages.push(imageUrl);
     }
 
-    const banner = new Banner({
+    const banner = await Banner.create({
       images: uploadedImages,
     });
-
-    await banner.save();
 
     return res.status(201).json({
       message: "Banner created successfully",
@@ -191,7 +188,6 @@ export const createBanner = async (req, res) => {
   }
 };
 
-
 export const updateBanner = async (req, res) => {
   try {
     const { id } = req.params;
@@ -202,7 +198,7 @@ export const updateBanner = async (req, res) => {
       return res.status(404).json({ message: "Banner not found" });
     }
 
-    // 🔁 If new images provided, replace old ones
+    // 🔁 If new images provided → replace old ones
     if (req.files && req.files.images) {
       let imagesFiles = req.files.images;
 
@@ -213,16 +209,20 @@ export const updateBanner = async (req, res) => {
       const uploadedImages = [];
 
       for (const file of imagesFiles) {
-        const result = await cloudinary.uploader.upload(
-          file.tempFilePath,
-          {
-            folder: "banners",
-          }
-        );
+        // unique file name
+        const fileName = Date.now() + "-" + file.name;
 
-        uploadedImages.push(result.secure_url);
+        const uploadPath = `uploads/banners/${fileName}`;
+
+        // save file locally
+        await file.mv(uploadPath);
+
+        const imageUrl = `${req.protocol}://${req.get("host")}/uploads/banners/${fileName}`;
+
+        uploadedImages.push(imageUrl);
       }
 
+      // (optional) old images delete logic can be added later
       banner.images = uploadedImages;
     }
 
@@ -238,7 +238,6 @@ export const updateBanner = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
-
 
 export const deleteBanner = async (req, res) => {
   try {

@@ -2,8 +2,12 @@ import Admin from "../Models/Admin.js";
 import Banner from "../Models/Banner.js";
 import College from "../Models/College.js";
 import Form from "../Models/Form.js";
+import GuideCategory from "../Models/GuideCategory.js";
+import GuideContent from "../Models/GuideContent.js";
 import Qna from "../Models/Qna.js";
 import User from "../Models/User.js";
+import mongoose from 'mongoose';
+
 
 /**
  * ADMIN REGISTER
@@ -354,5 +358,195 @@ export const getDashboardStats = async (req, res) => {
   } catch (error) {
     console.error("Error fetching dashboard stats:", error);
     return res.status(500).json({ message: "Server error" });
+  }
+};
+
+
+
+// Get all categories
+export const getAllCategories = async (req, res) => {
+  try {
+    const categories = await GuideCategory.find().sort({ createdAt: -1 });
+    res.status(200).json({ success: true, categories });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Get single category by ID
+export const getCategoryById = async (req, res) => {
+  try {
+    const category = await GuideCategory.findById(req.params.id);
+    if (!category) {
+      return res.status(404).json({ success: false, message: 'Category not found' });
+    }
+    res.status(200).json({ success: true, category });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Create new category
+export const createCategory = async (req, res) => {
+  try {
+    const { name } = req.body;
+    if (!name) {
+      return res.status(400).json({ success: false, message: 'Category name is required' });
+    }
+    const existing = await GuideCategory.findOne({ name });
+    if (existing) {
+      return res.status(400).json({ success: false, message: 'Category already exists' });
+    }
+    const category = new GuideCategory({ name });
+    await category.save();
+    res.status(201).json({ success: true, message: 'Category created', category });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Update category
+export const updateCategory = async (req, res) => {
+  try {
+    const { name } = req.body;
+    if (!name) {
+      return res.status(400).json({ success: false, message: 'Category name is required' });
+    }
+    const category = await GuideCategory.findByIdAndUpdate(
+      req.params.id,
+      { name },
+      { new: true, runValidators: true }
+    );
+    if (!category) {
+      return res.status(404).json({ success: false, message: 'Category not found' });
+    }
+    res.status(200).json({ success: true, message: 'Category updated', category });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Delete category (and all its guide contents)
+export const deleteCategory = async (req, res) => {
+  try {
+    const category = await GuideCategory.findByIdAndDelete(req.params.id);
+    if (!category) {
+      return res.status(404).json({ success: false, message: 'Category not found' });
+    }
+    // Delete all guide contents under this category
+    await GuideContent.deleteMany({ categoryId: req.params.id });
+    res.status(200).json({ success: true, message: 'Category and its contents deleted' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ==================== CONTENT CONTROLLERS ====================
+
+// Get all guide contents (optionally filter by categoryId)
+export const getAllContents = async (req, res) => {
+  try {
+    const { categoryId } = req.query;
+    let filter = {};
+    if (categoryId) filter.categoryId = categoryId;
+    const contents = await GuideContent.find(filter)
+      .populate('categoryId', 'name')
+      .sort({ createdAt: -1 });
+    res.status(200).json({ success: true, contents });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Get single content by ID
+export const getContentById = async (req, res) => {
+  try {
+    const content = await GuideContent.findById(req.params.id).populate('categoryId', 'name');
+    if (!content) {
+      return res.status(404).json({ success: false, message: 'Content not found' });
+    }
+    res.status(200).json({ success: true, content });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Create new guide content
+export const createContent = async (req, res) => {
+  try {
+    const { categoryId, question, answer, studyPoints, careerScope } = req.body;
+    if (!categoryId || !question || !answer) {
+      return res.status(400).json({ success: false, message: 'categoryId, question, answer are required' });
+    }
+    // Verify category exists
+    const category = await GuideCategory.findById(categoryId);
+    if (!category) {
+      return res.status(404).json({ success: false, message: 'Category not found' });
+    }
+    const newContent = new GuideContent({
+      categoryId,
+      question,
+      answer,
+      studyPoints: studyPoints || [],
+      careerScope: careerScope || '',
+    });
+    await newContent.save();
+    res.status(201).json({ success: true, message: 'Content created', content: newContent });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Update guide content
+export const updateContent = async (req, res) => {
+  try {
+    const { question, answer, studyPoints, careerScope } = req.body;
+    const content = await GuideContent.findByIdAndUpdate(
+      req.params.id,
+      { question, answer, studyPoints, careerScope },
+      { new: true, runValidators: true }
+    );
+    if (!content) {
+      return res.status(404).json({ success: false, message: 'Content not found' });
+    }
+    res.status(200).json({ success: true, message: 'Content updated', content });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Delete guide content
+export const deleteContent = async (req, res) => {
+  try {
+    const content = await GuideContent.findByIdAndDelete(req.params.id);
+    if (!content) {
+      return res.status(404).json({ success: false, message: 'Content not found' });
+    }
+    res.status(200).json({ success: true, message: 'Content deleted' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+
+
+// Get all guide contents (optionally filter by categoryId from query)
+export const getAllContentsByCat = async (req, res) => {
+  try {
+    const { categoryId } = req.query;
+    let filter = {};
+    if (categoryId) {
+      // Validate if categoryId is a valid ObjectId (optional but recommended)
+      if (!mongoose.Types.ObjectId.isValid(categoryId)) {
+        return res.status(400).json({ success: false, message: 'Invalid category ID format' });
+      }
+      filter.categoryId = categoryId;
+    }
+    const contents = await GuideContent.find(filter)
+      .populate('categoryId', 'name') // populate category name
+      .sort({ createdAt: -1 });
+    res.status(200).json({ success: true, contents });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
 };

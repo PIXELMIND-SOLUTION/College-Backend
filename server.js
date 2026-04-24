@@ -48,7 +48,7 @@ if (!fs.existsSync("uploads/profile")) {
 }
 
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://31.97.206.144:7686', 'https://vidya-enrolldeleteurl.vercel.app'],
+  origin: ['http://localhost:3000', 'http://31.97.206.144:7686', 'https://vidya-enrolldeleteurl.vercel.app', 'http://31.97.228.17:7686'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   credentials: true
 }));

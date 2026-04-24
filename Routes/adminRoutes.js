@@ -1,6 +1,6 @@
 import express from "express";
 import { registerAdmin, loginAdmin, getAllUsers, updateUser, deleteUser, getAllSubmittedForms, updateFormStatus, deleteSubmittedForm, getAdminProfile, getDashboardStats, getAllCategories, createCategory, getCategoryById, updateCategory, deleteCategory, getAllContents, createContent, getContentById, updateContent, deleteContent, getAllContentsByCat } from "../Controller/adminController.js";
-
+import { createCourse, getAllCourses, getCourseById, updateCourse, deleteCourse, toggleCourseStatus } from "../Controller/adminController.js"; 
 const router = express.Router();
 
 router.post("/register", registerAdmin);
@@ -33,6 +33,16 @@ router.put("/guide-contents/:id", updateContent);
 router.delete("/guide-contents/:id",  deleteContent);
 
 router.get("/guidecontentsbycat", getAllContentsByCat);
+
+
+// Course routes
+router.post('/create-course', createCourse);
+router.get('/all-courses', getAllCourses);
+router.get('/course/:id', getCourseById);
+router.put('/update-course/:id', updateCourse);
+router.delete('/delete-course/:id', deleteCourse);
+router.put('/toggle-course-status/:id', toggleCourseStatus);
+
 
 
 export default router;

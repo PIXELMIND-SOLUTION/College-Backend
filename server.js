@@ -12,6 +12,7 @@ import cloudinary from './config/cloudinary.js';
 import fileUpload from 'express-fileupload';
 import collegeRoutes from './Routes/collegeRoutes.js'
 import adminRoutes from "./Routes/adminRoutes.js"
+import courseFormRoutes from "./Routes/courseFormRoutes.js"
 import dns from "dns";   // 👈 ADD THIS
 import fs from "fs";
 
@@ -91,6 +92,7 @@ const server = http.createServer(app);
 app.use('/api/users', UserRoutes);
 app.use('/api/college', collegeRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/courseform', courseFormRoutes);
 
 
 

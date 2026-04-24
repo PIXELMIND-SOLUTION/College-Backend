@@ -4,9 +4,14 @@ import College from "../Models/College.js";
 import Form from "../Models/Form.js";
 import GuideCategory from "../Models/GuideCategory.js";
 import GuideContent from "../Models/GuideContent.js";
+import Course  from "../Models/Course.js";
 import Qna from "../Models/Qna.js";
 import User from "../Models/User.js";
 import mongoose from 'mongoose';
+
+
+// Define BASE_URL
+const BASE_URL = "http://31.97.206.144:4063";
 
 
 /**
@@ -547,6 +552,243 @@ export const getAllContentsByCat = async (req, res) => {
       .sort({ createdAt: -1 });
     res.status(200).json({ success: true, contents });
   } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+
+// Create new course (with optional image)
+export const createCourse = async (req, res) => {
+  try {
+    const { name, image } = req.body;
+
+    if (!name) {
+      return res.status(400).json({
+        success: false,
+        message: "Course name is required"
+      });
+    }
+
+    // Check if course already exists
+    const existingCourse = await Course.findOne({ name });
+    if (existingCourse) {
+      return res.status(400).json({
+        success: false,
+        message: `Course '${name}' already exists`
+      });
+    }
+
+    // Handle image (either file upload or URL)
+    let imageUrl = '';
+    
+    if (req.files && req.files.image) {
+      // Handle file upload
+      const imageFile = req.files.image;
+      const fileName = Date.now() + "-" + imageFile.name;
+      const uploadPath = `uploads/courses/${fileName}`;
+      await imageFile.mv(uploadPath);
+      imageUrl = `${BASE_URL}/uploads/courses/${fileName}`;
+    } 
+    else if (image) {
+      // Handle image URL from JSON
+      imageUrl = image;
+    }
+    // Image is optional, so no else condition
+
+    const course = new Course({ 
+      name,
+      image: imageUrl 
+    });
+    
+    await course.save();
+
+    res.status(201).json({
+      success: true,
+      message: "Course created successfully",
+      course
+    });
+
+  } catch (error) {
+    console.error("Error creating course:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Update course (with optional image)
+export const updateCourse = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, image } = req.body;
+    
+    if (!name) {
+      return res.status(400).json({
+        success: false,
+        message: "Course name is required"
+      });
+    }
+    
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid course ID format"
+      });
+    }
+    
+    const course = await Course.findById(id);
+    if (!course) {
+      return res.status(404).json({
+        success: false,
+        message: "Course not found"
+      });
+    }
+    
+    // Handle image (either file upload or URL)
+    let imageUrl = course.image; // Keep existing image by default
+    
+    if (req.files && req.files.image) {
+      // Handle file upload
+      const imageFile = req.files.image;
+      const fileName = Date.now() + "-" + imageFile.name;
+      const uploadPath = `uploads/courses/${fileName}`;
+      await imageFile.mv(uploadPath);
+      imageUrl = `${BASE_URL}/uploads/courses/${fileName}`;
+    } 
+    else if (image !== undefined) {
+      // Handle image URL from JSON (empty string means remove image)
+      imageUrl = image;
+    }
+    
+    const updatedCourse = await Course.findByIdAndUpdate(
+      id,
+      { name, image: imageUrl },
+      { new: true, runValidators: true }
+    );
+    
+    res.status(200).json({
+      success: true,
+      message: "Course updated successfully",
+      course: updatedCourse
+    });
+    
+  } catch (error) {
+    console.error("Error updating course:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Get all courses
+export const getAllCourses = async (req, res) => {
+  try {
+    const courses = await Course.find({ isActive: true }).sort({ createdAt: -1 });
+    
+    res.status(200).json({
+      success: true,
+      count: courses.length,
+      courses
+    });
+    
+  } catch (error) {
+    console.error("Error fetching courses:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Get single course by ID
+export const getCourseById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid course ID format"
+      });
+    }
+    
+    const course = await Course.findById(id);
+    
+    if (!course) {
+      return res.status(404).json({
+        success: false,
+        message: "Course not found"
+      });
+    }
+    
+    res.status(200).json({
+      success: true,
+      course
+    });
+    
+  } catch (error) {
+    console.error("Error fetching course:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Delete course
+export const deleteCourse = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid course ID format"
+      });
+    }
+    
+    const course = await Course.findByIdAndDelete(id);
+    
+    if (!course) {
+      return res.status(404).json({
+        success: false,
+        message: "Course not found"
+      });
+    }
+    
+    res.status(200).json({
+      success: true,
+      message: "Course deleted successfully"
+    });
+    
+  } catch (error) {
+    console.error("Error deleting course:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Toggle course status (activate/deactivate)
+export const toggleCourseStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid course ID format"
+      });
+    }
+    
+    const course = await Course.findById(id);
+    
+    if (!course) {
+      return res.status(404).json({
+        success: false,
+        message: "Course not found"
+      });
+    }
+    
+    course.isActive = !course.isActive;
+    await course.save();
+    
+    res.status(200).json({
+      success: true,
+      message: `Course ${course.isActive ? 'activated' : 'deactivated'} successfully`,
+      course
+    });
+    
+  } catch (error) {
+    console.error("Error toggling course status:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };

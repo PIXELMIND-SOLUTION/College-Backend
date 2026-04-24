@@ -1,3 +1,42 @@
+// import express from 'express';
+// import {
+//   createBanner,
+//   createCollege,
+//   deleteBanner,
+//   deleteCollege,
+//   deleteQuestion,
+//   getAllBanners,
+//   getAllColleges,
+//   getAllQuestions,
+//   getSingleCollege,
+//   postQuestion,
+//   updateBanner,
+//   updateCollege,
+//   updateQuestion
+// } from '../Controller/collegeController.js';
+
+// const router = express.Router()
+
+// router.post('/create-college', createCollege);
+// router.put("/updatecollege/:id", updateCollege);
+// router.delete("/deletecollege/:id", deleteCollege);
+// router.get('/getallcolleges', getAllColleges);
+// router.get('/getsinglecollege/:id', getSingleCollege);
+// router.post('/createbanner', createBanner);
+// router.post('/postqna', postQuestion);
+// router.get('/allqna', getAllQuestions);  // This is the new route
+// router.put('/updateqna/:id', updateQuestion);
+// router.delete('/deleteqna/:id', deleteQuestion);
+// router.put('/updatebanner/:id', updateBanner);
+// router.delete('/deletebanner/:id', deleteBanner);
+// router.post('/getallbanners', getAllBanners);
+
+
+
+// export default router;
+
+
+
 import express from 'express';
 import {
   createBanner,
@@ -9,10 +48,15 @@ import {
   getAllColleges,
   getAllQuestions,
   getSingleCollege,
+  getCollegesByGuideCategory,
+  getCollegesByCategoryName,
+  getCompleteCategoryDetails,
+  getCategoryStatistics,
   postQuestion,
   updateBanner,
   updateCollege,
   updateQuestion
+  
 } from '../Controller/collegeController.js';
 
 const router = express.Router()
@@ -22,6 +66,10 @@ router.put("/updatecollege/:id", updateCollege);
 router.delete("/deletecollege/:id", deleteCollege);
 router.get('/getallcolleges', getAllColleges);
 router.get('/getsinglecollege/:id', getSingleCollege);
+router.get('/getcollegesbyguidecategory', getCollegesByGuideCategory);
+router.get('/getcollegesbycategoryname', getCollegesByCategoryName);
+router.get('/getcompletecategorydetails/:categoryId', getCompleteCategoryDetails);
+router.get('/getcategorystatistics', getCategoryStatistics);
 router.post('/createbanner', createBanner);
 router.post('/postqna', postQuestion);
 router.get('/allqna', getAllQuestions);  // This is the new route

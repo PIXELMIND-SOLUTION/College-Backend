@@ -85,10 +85,10 @@ const userSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Define indexes only once, outside the schema
 userSchema.index({ email: 1 });
 userSchema.index({ aadhaarCardNumber: 1 }, { unique: true, sparse: true });
 userSchema.index({ mobile: 1 });
 
 const User = mongoose.model('User', userSchema);
 export default User;
+

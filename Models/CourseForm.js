@@ -1,6 +1,11 @@
 import mongoose from 'mongoose';
 
 const courseFormSchema = new mongoose.Schema({
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: [true, 'User ID is required']
+  },
   name: {
     type: String,
     required: [true, 'Name is required'],
@@ -19,20 +24,19 @@ const courseFormSchema = new mongoose.Schema({
     lowercase: true,
     match: [/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/, 'Please enter a valid email']
   },
-  education: {
+  courseId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Course',
+    required: [true, 'Course selection is required']
+  },
+  qualification: {
     type: String,
-    required: [true, 'Education is required'],
-    enum: ['10th', '12th', 'Graduation', 'Post Graduation', 'Diploma', 'Other'],
+    required: [true, 'Qualification is required'],
     trim: true
   },
-  previousCourse: {
+  message: {
     type: String,
-    required: [true, 'Previous course is required'],
-    trim: true
-  },
-  chooseCourse: {
-    type: String,
-    required: [true, 'Please select a course'],
+    default: '',
     trim: true
   },
   status: {
@@ -51,13 +55,12 @@ const courseFormSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 // Create indexes for faster queries
+courseFormSchema.index({ userId: 1 });
 courseFormSchema.index({ mobile: 1 });
 courseFormSchema.index({ email: 1 });
+courseFormSchema.index({ courseId: 1 });
 courseFormSchema.index({ status: 1 });
 courseFormSchema.index({ createdAt: -1 });
 
-
-
 const CourseForm = mongoose.model('CourseForm', courseFormSchema);
-
 export default CourseForm;

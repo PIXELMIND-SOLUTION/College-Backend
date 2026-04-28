@@ -1,22 +1,39 @@
 import mongoose from 'mongoose';
-import  CourseForm  from '../Models/CourseForm.js';
+import CourseForm from '../Models/CourseForm.js';
+import Course from '../Models/Course.js';
+import User from '../Models/User.js';
 
-
-
-// Submit new course form
+// Submit course form with user ID
 export const submitCourseForm = async (req, res) => {
   try {
-    const { name, mobile, email, education, previousCourse, chooseCourse } = req.body;
+    const { userId, name, mobile, email, courseId, qualification, message } = req.body;
 
     // Validate required fields
-    if (!name || !mobile || !email || !education || !previousCourse || !chooseCourse) {
+    if (!userId || !name || !mobile || !email || !courseId || !qualification) {
       return res.status(400).json({
         success: false,
-        message: "All fields are required: name, mobile, email, education, previousCourse, chooseCourse"
+        message: "All fields are required: userId, name, mobile, email, courseId, qualification"
       });
     }
 
-    // Validate mobile number (10 digits)
+    // Validate userId format
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid user ID format"
+      });
+    }
+
+    // Verify user exists
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found. Please login again."
+      });
+    }
+
+    // Validate mobile number
     const mobileRegex = /^[0-9]{10}$/;
     if (!mobileRegex.test(mobile)) {
       return res.status(400).json({
@@ -34,10 +51,34 @@ export const submitCourseForm = async (req, res) => {
       });
     }
 
-    // Check if form already submitted with same email or mobile
+    // Validate courseId format
+    if (!mongoose.Types.ObjectId.isValid(courseId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid course ID format"
+      });
+    }
+
+    // Verify course exists and is active
+    const course = await Course.findById(courseId);
+    if (!course) {
+      return res.status(404).json({
+        success: false,
+        message: "Selected course not found"
+      });
+    }
+
+    if (!course.isActive) {
+      return res.status(400).json({
+        success: false,
+        message: "Selected course is currently not available"
+      });
+    }
+
+    // Check for duplicate submission by same user in last 24 hours
     const existingSubmission = await CourseForm.findOne({
-      $or: [{ email }, { mobile }],
-      createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } // Last 24 hours
+      userId,
+      createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
     });
 
     if (existingSubmission) {
@@ -49,27 +90,40 @@ export const submitCourseForm = async (req, res) => {
 
     // Create new course form submission
     const courseForm = new CourseForm({
+      userId,
       name,
       mobile,
       email,
-      education,
-      previousCourse,
-      chooseCourse
+      courseId,
+      qualification,
+      message: message || ''
     });
 
     await courseForm.save();
+
+    // Populate course and user details for response
+    await courseForm.populate('courseId', 'name duration tag image');
+    await courseForm.populate('userId', 'name email mobile');
 
     res.status(201).json({
       success: true,
       message: "Course form submitted successfully! Our team will contact you soon.",
       data: {
         id: courseForm._id,
-        name: courseForm.name,
-        email: courseForm.email,
-        mobile: courseForm.mobile,
-        education: courseForm.education,
-        previousCourse: courseForm.previousCourse,
-        chooseCourse: courseForm.chooseCourse,
+        user: {
+          id: courseForm.userId._id,
+          name: courseForm.userId.name,
+          email: courseForm.userId.email,
+          mobile: courseForm.userId.mobile
+        },
+        course: {
+          id: courseForm.courseId._id,
+          name: courseForm.courseId.name,
+          duration: courseForm.courseId.duration,
+          tag: courseForm.courseId.tag
+        },
+        qualification: courseForm.qualification,
+        message: courseForm.message,
         status: courseForm.status,
         submittedAt: courseForm.submittedAt
       }
@@ -77,24 +131,67 @@ export const submitCourseForm = async (req, res) => {
 
   } catch (error) {
     console.error("Error submitting course form:", error);
-    res.status(500).json({
-      success: false,
-      message: error.message || "Server error"
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// Get all form submissions (Admin only)
+// Get submissions by user ID
+export const getSubmissionsByUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid user ID format"
+      });
+    }
+    
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+    
+    const submissions = await CourseForm.find({ userId })
+      .populate('courseId', 'name duration tag image description')
+      .sort({ createdAt: -1 });
+    
+    res.status(200).json({
+      success: true,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        mobile: user.mobile
+      },
+      count: submissions.length,
+      submissions
+    });
+    
+  } catch (error) {
+    console.error("Error fetching user submissions:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Get all form submissions (Admin) - with user filter
 export const getAllSubmissions = async (req, res) => {
   try {
-    const { status, page = 1, limit = 10 } = req.query;
-    
+    const { status, courseId, userId, page = 1, limit = 10 } = req.query;
     let filter = {};
+    
     if (status) filter.status = status;
+    if (courseId && mongoose.Types.ObjectId.isValid(courseId)) filter.courseId = courseId;
+    if (userId && mongoose.Types.ObjectId.isValid(userId)) filter.userId = userId;
     
     const skip = (parseInt(page) - 1) * parseInt(limit);
     
     const submissions = await CourseForm.find(filter)
+      .populate('courseId', 'name duration tag image')
+      .populate('userId', 'name email mobile')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit));
@@ -112,10 +209,7 @@ export const getAllSubmissions = async (req, res) => {
     
   } catch (error) {
     console.error("Error fetching submissions:", error);
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -131,7 +225,9 @@ export const getSubmissionById = async (req, res) => {
       });
     }
     
-    const submission = await CourseForm.findById(id);
+    const submission = await CourseForm.findById(id)
+      .populate('courseId', 'name duration tag description careerScope features')
+      .populate('userId', 'name email mobile aadhaarCardNumber');
     
     if (!submission) {
       return res.status(404).json({
@@ -147,10 +243,7 @@ export const getSubmissionById = async (req, res) => {
     
   } catch (error) {
     console.error("Error fetching submission:", error);
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -166,7 +259,10 @@ export const getSubmissionsByEmail = async (req, res) => {
       });
     }
     
-    const submissions = await CourseForm.find({ email }).sort({ createdAt: -1 });
+    const submissions = await CourseForm.find({ email })
+      .populate('courseId', 'name duration tag')
+      .populate('userId', 'name email mobile')
+      .sort({ createdAt: -1 });
     
     res.status(200).json({
       success: true,
@@ -176,10 +272,7 @@ export const getSubmissionsByEmail = async (req, res) => {
     
   } catch (error) {
     console.error("Error fetching submissions by email:", error);
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -195,7 +288,10 @@ export const getSubmissionsByMobile = async (req, res) => {
       });
     }
     
-    const submissions = await CourseForm.find({ mobile }).sort({ createdAt: -1 });
+    const submissions = await CourseForm.find({ mobile })
+      .populate('courseId', 'name duration tag')
+      .populate('userId', 'name email mobile')
+      .sort({ createdAt: -1 });
     
     res.status(200).json({
       success: true,
@@ -205,10 +301,48 @@ export const getSubmissionsByMobile = async (req, res) => {
     
   } catch (error) {
     console.error("Error fetching submissions by mobile:", error);
-    res.status(500).json({
-      success: false,
-      message: error.message
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Get submissions by course
+export const getSubmissionsByCourse = async (req, res) => {
+  try {
+    const { courseId } = req.params;
+    
+    if (!mongoose.Types.ObjectId.isValid(courseId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid course ID format"
+      });
+    }
+    
+    const course = await Course.findById(courseId);
+    if (!course) {
+      return res.status(404).json({
+        success: false,
+        message: "Course not found"
+      });
+    }
+    
+    const submissions = await CourseForm.find({ courseId })
+      .populate('courseId', 'name duration tag')
+      .populate('userId', 'name email mobile')
+      .sort({ createdAt: -1 });
+    
+    res.status(200).json({
+      success: true,
+      course: {
+        id: course._id,
+        name: course.name
+      },
+      count: submissions.length,
+      submissions
     });
+    
+  } catch (error) {
+    console.error("Error fetching submissions by course:", error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -241,7 +375,7 @@ export const updateSubmissionStatus = async (req, res) => {
       id,
       updateData,
       { new: true, runValidators: true }
-    );
+    ).populate('courseId', 'name').populate('userId', 'name email mobile');
     
     if (!submission) {
       return res.status(404).json({
@@ -300,7 +434,7 @@ export const deleteSubmission = async (req, res) => {
   }
 };
 
-// Get statistics (Admin only)
+// Get form statistics (Admin only)
 export const getFormStatistics = async (req, res) => {
   try {
     const total = await CourseForm.countDocuments();
@@ -309,12 +443,34 @@ export const getFormStatistics = async (req, res) => {
     const enrolled = await CourseForm.countDocuments({ status: 'enrolled' });
     const rejected = await CourseForm.countDocuments({ status: 'rejected' });
     
-    const educationStats = await CourseForm.aggregate([
-      { $group: { _id: '$education', count: { $sum: 1 } } }
+    const courseStats = await CourseForm.aggregate([
+      {
+        $lookup: {
+          from: 'courses',
+          localField: 'courseId',
+          foreignField: '_id',
+          as: 'courseInfo'
+        }
+      },
+      { $unwind: '$courseInfo' },
+      {
+        $group: {
+          _id: '$courseInfo.name',
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { count: -1 } }
     ]);
     
-    const courseStats = await CourseForm.aggregate([
-      { $group: { _id: '$chooseCourse', count: { $sum: 1 } } }
+    const userStats = await CourseForm.aggregate([
+      {
+        $group: {
+          _id: '$userId',
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { count: -1 } },
+      { $limit: 10 }
     ]);
     
     res.status(200).json({
@@ -325,8 +481,8 @@ export const getFormStatistics = async (req, res) => {
         contacted,
         enrolled,
         rejected,
-        educationStats,
-        courseStats
+        courseStats,
+        topUsers: userStats
       }
     });
     

@@ -5,6 +5,8 @@ import {
   getSubmissionById,
   getSubmissionsByEmail,
   getSubmissionsByMobile,
+  getSubmissionsByCourse,
+  getSubmissionsByUser,
   updateSubmissionStatus,
   deleteSubmission,
   getFormStatistics
@@ -12,19 +14,20 @@ import {
 
 const router = express.Router();
 
-
-//user routes
+// Public routes (requires authentication - user must be logged in)
 router.post('/submit', submitCourseForm);
 
+// User routes (get user's own submissions)
+router.get('/my-submissions/:userId', getSubmissionsByUser);
+
 // Admin routes
-router.get('/all', getAllSubmissions);
-router.get('/statistics', getFormStatistics);
-router.get('/by-email', getSubmissionsByEmail);
-router.get('/by-mobile', getSubmissionsByMobile);
-router.get('/:id', getSubmissionById);
-router.put('/:id/status', updateSubmissionStatus);
-router.delete('/:id', deleteSubmission);
-
-
+router.get('/submissions/all', getAllSubmissions);
+router.get('/submissions/statistics', getFormStatistics);
+router.get('/submissions/by-email', getSubmissionsByEmail);
+router.get('/submissions/by-mobile', getSubmissionsByMobile);
+router.get('/submissions/by-course/:courseId', getSubmissionsByCourse);
+router.get('/submissions/:id', getSubmissionById);
+router.put('/submissions/:id/status', updateSubmissionStatus);
+router.delete('/submissions/:id', deleteSubmission);
 
 export default router;

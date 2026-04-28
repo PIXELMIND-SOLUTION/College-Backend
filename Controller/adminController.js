@@ -557,15 +557,40 @@ export const getAllContentsByCat = async (req, res) => {
 };
 
 
-// Create new course (with optional image)
+
+// Create new course (with all fields)
 export const createCourse = async (req, res) => {
   try {
-    const { name, image } = req.body;
+    const { 
+      name, 
+      subtitle, 
+      duration, 
+      tag, 
+      about, 
+      features, 
+      careerScope, 
+      image 
+    } = req.body;
 
+    // Validate required fields
     if (!name) {
       return res.status(400).json({
         success: false,
         message: "Course name is required"
+      });
+    }
+
+    if (!duration) {
+      return res.status(400).json({
+        success: false,
+        message: "Course duration is required"
+      });
+    }
+
+    if (!about) {
+      return res.status(400).json({
+        success: false,
+        message: "Course about/description is required"
       });
     }
 
@@ -579,25 +604,40 @@ export const createCourse = async (req, res) => {
     }
 
     // Handle image (either file upload or URL)
-    let imageUrl = '';
+    let imageUrl = 'https://via.placeholder.com/150';
     
     if (req.files && req.files.image) {
       // Handle file upload
       const imageFile = req.files.image;
-      const fileName = Date.now() + "-" + imageFile.name;
+      const fileName = Date.now() + "-" + imageFile.name.replace(/\s/g, '_');
       const uploadPath = `uploads/courses/${fileName}`;
       await imageFile.mv(uploadPath);
       imageUrl = `${BASE_URL}/uploads/courses/${fileName}`;
     } 
     else if (image) {
-      // Handle image URL from JSON
       imageUrl = image;
     }
-    // Image is optional, so no else condition
+
+    // Parse arrays if sent as JSON strings
+    let featuresArray = [];
+    if (features) {
+      featuresArray = typeof features === 'string' ? JSON.parse(features) : features;
+    }
+
+    let careerScopeArray = [];
+    if (careerScope) {
+      careerScopeArray = typeof careerScope === 'string' ? JSON.parse(careerScope) : careerScope;
+    }
 
     const course = new Course({ 
       name,
-      image: imageUrl 
+      subtitle: subtitle || '',
+      image: imageUrl,
+      duration,
+      tag: tag || '',
+      about,
+      features: featuresArray,
+      careerScope: careerScopeArray
     });
     
     await course.save();
@@ -614,11 +654,22 @@ export const createCourse = async (req, res) => {
   }
 };
 
-// Update course (with optional image)
+
+
+// Update course (with all fields)
 export const updateCourse = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, image } = req.body;
+    const { 
+      name, 
+      subtitle, 
+      duration, 
+      tag, 
+      about, 
+      features, 
+      careerScope, 
+      image 
+    } = req.body;
     
     if (!name) {
       return res.status(400).json({
@@ -648,7 +699,7 @@ export const updateCourse = async (req, res) => {
     if (req.files && req.files.image) {
       // Handle file upload
       const imageFile = req.files.image;
-      const fileName = Date.now() + "-" + imageFile.name;
+      const fileName = Date.now() + "-" + imageFile.name.replace(/\s/g, '_');
       const uploadPath = `uploads/courses/${fileName}`;
       await imageFile.mv(uploadPath);
       imageUrl = `${BASE_URL}/uploads/courses/${fileName}`;
@@ -657,10 +708,30 @@ export const updateCourse = async (req, res) => {
       // Handle image URL from JSON (empty string means remove image)
       imageUrl = image;
     }
+
+    // Parse arrays if sent as JSON strings
+    let featuresArray = features;
+    if (features && typeof features === 'string') {
+      featuresArray = JSON.parse(features);
+    }
+
+    let careerScopeArray = careerScope;
+    if (careerScope && typeof careerScope === 'string') {
+      careerScopeArray = JSON.parse(careerScope);
+    }
     
     const updatedCourse = await Course.findByIdAndUpdate(
       id,
-      { name, image: imageUrl },
+      {
+        name,
+        subtitle: subtitle || course.subtitle,
+        image: imageUrl,
+        duration: duration || course.duration,
+        tag: tag !== undefined ? tag : course.tag,
+        about: about || course.about,
+        features: featuresArray !== undefined ? featuresArray : course.features,
+        careerScope: careerScopeArray !== undefined ? careerScopeArray : course.careerScope
+      },
       { new: true, runValidators: true }
     );
     
@@ -676,10 +747,42 @@ export const updateCourse = async (req, res) => {
   }
 };
 
-// Get all courses
+// Get all courses (with filters)
 export const getAllCourses = async (req, res) => {
   try {
-    const courses = await Course.find({ isActive: true }).sort({ createdAt: -1 });
+    const { tag, search, isActive, limit } = req.query;
+    let filter = {};
+    
+    // Filter by isActive (default to true if not specified)
+    if (isActive !== undefined) {
+      filter.isActive = isActive === 'true';
+    } else {
+      filter.isActive = true;
+    }
+    
+    // Filter by tag
+    if (tag) {
+      filter.tag = tag;
+    }
+    
+    // Search in name, subtitle, tag, about
+    if (search) {
+      filter.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { subtitle: { $regex: search, $options: 'i' } },
+        { tag: { $regex: search, $options: 'i' } },
+        { about: { $regex: search, $options: 'i' } }
+      ];
+    }
+    
+    let query = Course.find(filter).sort({ createdAt: -1 });
+    
+    // Apply limit if provided
+    if (limit && !isNaN(limit)) {
+      query = query.limit(parseInt(limit));
+    }
+    
+    const courses = await query;
     
     res.status(200).json({
       success: true,
@@ -789,6 +892,69 @@ export const toggleCourseStatus = async (req, res) => {
     
   } catch (error) {
     console.error("Error toggling course status:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Get courses by tag
+export const getCoursesByTag = async (req, res) => {
+  try {
+    const { tag } = req.params;
+    
+    if (!tag) {
+      return res.status(400).json({
+        success: false,
+        message: "Tag is required"
+      });
+    }
+    
+    const courses = await Course.find({ 
+      tag: { $regex: new RegExp(`^${tag}$`, 'i') },
+      isActive: true 
+    }).sort({ createdAt: -1 });
+    
+    res.status(200).json({
+      success: true,
+      tag: tag,
+      count: courses.length,
+      courses
+    });
+    
+  } catch (error) {
+    console.error("Error fetching courses by tag:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Get course statistics
+export const getCourseStatistics = async (req, res) => {
+  try {
+    const totalCourses = await Course.countDocuments();
+    const activeCourses = await Course.countDocuments({ isActive: true });
+    const inactiveCourses = await Course.countDocuments({ isActive: false });
+    
+    // Get unique tags
+    const tags = await Course.distinct('tag');
+    const tagStats = await Promise.all(
+      tags.map(async (tag) => ({
+        tag,
+        count: await Course.countDocuments({ tag, isActive: true })
+      }))
+    );
+    
+    res.status(200).json({
+      success: true,
+      statistics: {
+        totalCourses,
+        activeCourses,
+        inactiveCourses,
+        totalTags: tags.length,
+        tags: tagStats
+      }
+    });
+    
+  } catch (error) {
+    console.error("Error fetching course statistics:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };

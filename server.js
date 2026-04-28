@@ -222,6 +222,7 @@ import courseFormRoutes from "./Routes/courseFormRoutes.js";
 import dns from "dns";
 import fs from "fs";
 import mongoose from 'mongoose'; // ✅ ADDED
+import EntranceExamRoutes from './Routes/EntranceExamRoutes.js';
 
 dns.setServers(["8.8.8.8", "8.8.4.4"]);
 dotenv.config();
@@ -287,6 +288,7 @@ app.use('/api/users', UserRoutes);
 app.use('/api/college', collegeRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/courseform', courseFormRoutes);
+app.use('/api/entrance', EntranceExamRoutes);
 
 // ✅ NEW: 404 handler for undefined routes
 app.use((req, res) => {

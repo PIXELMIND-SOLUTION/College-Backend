@@ -14,13 +14,10 @@ import {
 
 const router = express.Router();
 
-// Public routes (requires authentication - user must be logged in)
 router.post('/submit', submitCourseForm);
 
-// User routes (get user's own submissions)
 router.get('/my-submissions/:userId', getSubmissionsByUser);
 
-// Admin routes
 router.get('/submissions/all', getAllSubmissions);
 router.get('/submissions/statistics', getFormStatistics);
 router.get('/submissions/by-email', getSubmissionsByEmail);

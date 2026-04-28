@@ -4,7 +4,7 @@ const courseSchema = new mongoose.Schema({
   name: {
     type: String,
     required: [true, 'Course name is required'],
-    unique: true,
+    unique: true, 
     trim: true
   },
   subtitle: {
@@ -45,8 +45,6 @@ const courseSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-// Create indexes for better search performance
-courseSchema.index({ name: 1 });
 courseSchema.index({ tag: 1 });
 courseSchema.index({ isActive: 1 });
 
